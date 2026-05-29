@@ -8,7 +8,6 @@ import time
 
 from bcm_rte         import RTE, load_ldf_config, load_dbc_config
 from xcp_slave       import XCPSlave
-from xcp_server_bcm  import XCPServerBCM
 from bcm_protocol    import ProtocolLayer, DOIP_PORT, DSC_DEFAULT
 from bcm_application import ApplicationLayer
 from dtc_manager     import DTCManager
@@ -70,10 +69,6 @@ class BCM:
         # rte=None : le slave XCP écrit directement dans bcm_rte (module Python),
         # pas via Redis — il ne doit jamais acquérir le verrou RTE.
         self.xcp = XCPSlave(redis_host, redis_port, rte=None)
-
-        # XCP Server BCM : reçoit les SHORT_DOWNLOAD du HIL (XCPClient),
-        # met à jour memory.json et déclenche les DTCs selon les conditions BCM.
-        self.xcp_server = XCPServerBCM(dtc_manager=self.dtc, rte=self.rte)
 
         self.protocol = ProtocolLayer(self.rte, self.dtc)
         self.protocol.init_can()
@@ -219,7 +214,6 @@ class BCM:
         threads = [
             ("T-REDIS",     self._thread_redis_publish),
             ("T-XCP",       self.xcp.run),
-            ("T-XCP-SRV",   self.xcp_server.run),
             ("T-REDIS-CMD", self._thread_redis_cmd),
             ("T-LIN",       self.protocol.thread_lin_scheduler),
             ("T-CAN",       self.protocol.thread_can_receiver),

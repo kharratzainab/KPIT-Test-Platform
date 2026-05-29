@@ -42,7 +42,13 @@ Supported UDS sub-functions (Section 8):
 
 import json
 import os
+import time as _time_mod
 from datetime import datetime
+
+
+def _now_ts() -> float:
+    """Timestamp Unix courant (pour calcul durees ISO 14229-1)."""
+    return _time_mod.time()
 
 # =====================================================
 # STATUS BYTE (Diagnostic Specification Section 10)
@@ -71,6 +77,12 @@ SNAP_DID_RAIN_INTENS = 0xF194   # Rain intensity (0-100)
 SNAP_DID_VEHICLE_SPD = 0xF195   # Vehicle speed (km/h)
 
 MAX_SNAPSHOT_RECORDS = 5
+
+# Extended Data Record numbers (ISO 14229-1 Section 7.3.4)
+EXT_REC_OCCURRENCE_COUNT  = 0x01   # Nombre total d'occurrences (2B)
+EXT_REC_FAILED_CYCLES     = 0x03   # Cycles où le DTC était actif (1B)
+EXT_REC_TIME_FIRST_OCC    = 0x04   # Secondes depuis première occurrence (4B)
+EXT_REC_TIME_LAST_OCC     = 0x05   # Secondes depuis dernière occurrence (4B)
 
 DTC_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dtc_database.json")
 
@@ -115,13 +127,29 @@ class DTCManager:
             return
         dtc = self.dtcs[code]
         now = self._now()
+
+        # Ne pas incr?menter l'occurrence si le DTC est d?j? ACTIVE
+        # (?vite les incr?ments r?p?t?s lors d'une surveillance cyclique).
+        # Le cycle normal est : INACTIVE ? ACTIVE (faute) ? INACTIVE (cleanup)
+        # ? ACTIVE (prochain run avec affichage complet).
+        already_active = (dtc["status"] == STATUS_ACTIVE)
+
+        if already_active:
+            return
+
         is_new = dtc["first_occurrence"] is None
 
         dtc["status"]           = STATUS_ACTIVE
         dtc["occurrence_count"] += 1
         dtc["last_occurrence"]  = now
+        dtc["last_occurrence_ts"] = _now_ts()
         if is_new:
-            dtc["first_occurrence"] = now
+            dtc["first_occurrence"]    = now
+            dtc["first_occurrence_ts"] = _now_ts()
+        # failed_cycles : incrémenté UNE SEULE FOIS par cycle d'allumage
+        if not dtc.get("_seen_this_cycle", False):
+            dtc["failed_cycles"]    = dtc.get("failed_cycles", 0) + 1
+            dtc["_seen_this_cycle"] = True
 
         if snapshot:
             dtc["snapshot"] = snapshot
@@ -180,14 +208,30 @@ class DTCManager:
     # -------------------------------------------------
     # Clear DTCs (UDS 0x14)
     # -------------------------------------------------
+    def get_status(self, code: str) -> str:
+        """Retourne statut DTC : ACTIVE / INACTIVE / CLEAN / UNKNOWN."""
+        if code not in self.dtcs:
+            return "UNKNOWN"
+        s = self.dtcs[code]["status"]
+        if s == STATUS_ACTIVE:   return "ACTIVE"
+        if s == STATUS_INACTIVE: return "INACTIVE"
+        return "CLEAN"
+
+    # -------------------------------------------------
+    # Clear DTCs (UDS 0x14)
+    # -------------------------------------------------
     def clear_all(self):
         for code in self.dtcs:
-            self.dtcs[code]["status"]           = STATUS_CLEAN
-            self.dtcs[code]["occurrence_count"] = 0
-            self.dtcs[code]["first_occurrence"] = None
-            self.dtcs[code]["last_occurrence"]  = None
-            self.dtcs[code]["snapshot"]         = {}
-            self.dtcs[code]["snapshot_records"] = []
+            self.dtcs[code]["status"]              = STATUS_CLEAN
+            self.dtcs[code]["occurrence_count"]    = 0
+            self.dtcs[code]["first_occurrence"]    = None
+            self.dtcs[code]["first_occurrence_ts"] = None
+            self.dtcs[code]["last_occurrence"]     = None
+            self.dtcs[code]["last_occurrence_ts"]  = None
+            self.dtcs[code]["failed_cycles"]       = 0
+            self.dtcs[code]["_seen_this_cycle"]    = False
+            self.dtcs[code]["snapshot"]            = {}
+            self.dtcs[code]["snapshot_records"]    = []
         self._save()
         now = self._now()
         print(f"")
@@ -205,10 +249,13 @@ class DTCManager:
         for code, dtc in self.dtcs.items():
             status = dtc["status"]
             if mask == 0xFF:
+                # 0xFF = tous les DTC non CLEAN
                 if status != STATUS_CLEAN:
                     result.append((bytes(dtc["bytes"]), status))
             else:
-                if (status & mask) != 0:
+                # Comparaison exacte : mask=0x2F -> ACTIVE seulement
+                #                      mask=0x2E -> INACTIVE seulement
+                if status == mask:
                     result.append((bytes(dtc["bytes"]), status))
         return result
 
@@ -250,9 +297,17 @@ class DTCManager:
         if target is None:
             return bytes([0x7F, 0x19, 0x31])
 
-        records = target.get("snapshot_records", [])
-        if record_number != 0xFF:
-            records = [r for r in records if r["record_number"] == record_number]
+        all_records = target.get("snapshot_records", [])
+
+        if record_number == 0xFF:
+            # 0xFF = send all records
+            records = all_records
+        else:
+            # Try exact match first
+            records = [r for r in all_records if r["record_number"] == record_number]
+            # If not found and records exist, return the LAST (most recent) record
+            if not records and all_records:
+                records = [all_records[-1]]
 
         resp = bytes([0x59, 0x04]) + dtc_bytes_target + bytes([target["status"]])
 
@@ -272,7 +327,7 @@ class DTCManager:
             resp += bytes([0xF1, 0x91, 0x0A]) + mode_bytes
 
             # F192 - MotorCurrent mA (2 bytes)
-            curr = d["F192_motor_curr"]
+            curr = int(round(d["F192_motor_curr"]))   # FIX: cast float ? int (mA)
             resp += bytes([0xF1, 0x92, 0x02, (curr >> 8) & 0xFF, curr & 0xFF])
 
             # F193 - BladePosition 0-100% (1 byte)
@@ -282,15 +337,19 @@ class DTCManager:
             resp += bytes([0xF1, 0x94, 0x01, d["F194_rain"] & 0xFF])
 
             # F195 - VehicleSpeed km/h (2 bytes)
-            spd = d["F195_vehicle_spd"]
+            spd = int(round(d["F195_vehicle_spd"]))   # FIX: cast float ? int (km/h)
             resp += bytes([0xF1, 0x95, 0x02, (spd >> 8) & 0xFF, spd & 0xFF])
 
         return resp
 
     # -------------------------------------------------
-    # UDS 0x19 sub-function 0x06 - Extended data
+    # UDS 0x19 sub-function 0x06 - Extended data (ISO 14229-1)
+    # Records : 0x01 occurrence_count | 0x03 failed_cycles
+    #           0x03 failed_cycles    | 0x04 time_first_occ
+    #           0x05 time_last_occ
     # -------------------------------------------------
     def build_response_06(self, dtc_bytes_target: bytes) -> bytes:
+        import struct as _struct
         target = None
         for code, dtc in self.dtcs.items():
             if bytes(dtc["bytes"]) == dtc_bytes_target:
@@ -298,15 +357,64 @@ class DTCManager:
                 break
         if target is None:
             return bytes([0x7F, 0x19, 0x31])
+
         resp = bytes([0x59, 0x06]) + dtc_bytes_target + bytes([target["status"]])
-        # Extended record: occurrence count (2 bytes)
-        occ = target["occurrence_count"]
-        resp += bytes([0x01, 0x02, (occ >> 8) & 0xFF, occ & 0xFF])
+
+        now = _now_ts()
+
+        # Record 0x01 : occurrence counter (2 octets)
+        occ = target.get("occurrence_count", 0)
+        resp += bytes([EXT_REC_OCCURRENCE_COUNT, 0x02,
+                       (occ >> 8) & 0xFF, occ & 0xFF])
+
+        # Record 0x03 : failed cycles counter (1 octet)
+        fc = min(target.get("failed_cycles", 0), 0xFF)
+        resp += bytes([EXT_REC_FAILED_CYCLES, 0x01, fc])
+
+        # Record 0x04 : time since first occurrence (4 octets, secondes)
+        ts_first = target.get("first_occurrence_ts")
+        dt_first = int(now - ts_first) if ts_first else 0xFFFFFFFF
+        dt_first = min(dt_first, 0xFFFFFFFF)
+        resp += bytes([EXT_REC_TIME_FIRST_OCC, 0x04]) + _struct.pack(">I", dt_first)
+
+        # Record 0x05 : time since last occurrence (4 octets, secondes)
+        ts_last = target.get("last_occurrence_ts")
+        dt_last = int(now - ts_last) if ts_last else 0xFFFFFFFF
+        dt_last = min(dt_last, 0xFFFFFFFF)
+        resp += bytes([EXT_REC_TIME_LAST_OCC, 0x04]) + _struct.pack(">I", dt_last)
+
         return resp
 
     # -------------------------------------------------
     # Debug
     # -------------------------------------------------
+    # -------------------------------------------------
+    # Gestion cycle d'allumage (ISO 14229-1 failed_cycles)
+    # -------------------------------------------------
+    def notify_ignition_on(self):
+        """
+        Appeler lors de la transition ignition OFF->ON.
+        - Si un DTC est encore ACTIVE au debut du nouveau cycle,
+          incrementer failed_cycles maintenant (persistant du cycle
+          precedent vers le nouveau).
+        - Sinon remettre _seen_this_cycle=False.
+        """
+        for dtc in self.dtcs.values():
+            if dtc.get("status") == STATUS_ACTIVE:
+                dtc["failed_cycles"]    = dtc.get("failed_cycles", 0) + 1
+                dtc["_seen_this_cycle"] = True
+            else:
+                dtc["_seen_this_cycle"] = False
+        print("[DTC] Nouveau cycle allumage - failed_cycles mis a jour")
+
+    def notify_ignition_off(self):
+        """
+        Appeler lors de la transition ignition ON->OFF.
+        Sauvegarde l'etat final du cycle.
+        """
+        self._save()
+        print("[DTC] Fin cycle allumage - base DTC sauvegardee")
+
     def print_all(self):
         print(f"\n{'='*56}")
         print(f"  DTC DATABASE ({len(self.dtcs)} entries)")
@@ -373,7 +481,7 @@ def handle_clear_dtc(dtc_mgr: DTCManager, uds: bytes) -> bytes:
         return bytes([0x7F, 0x14, 0x13])
     group = (uds[1] << 16) | (uds[2] << 8) | uds[3]
     print(f"  [UDS 0x14] Clear DTC group=0x{group:06X}")
-    if group == 0xFFFFFF:
+    if group == 0xFFFFFF or group == 0x000000:
         dtc_mgr.clear_all()
         return bytes([0x54])
     # Clear specific DTC

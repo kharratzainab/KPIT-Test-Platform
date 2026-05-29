@@ -25,6 +25,7 @@ PORT : 5000 (TCP)
 """
 
 import json
+import queue
 import socket
 import threading
 
@@ -32,12 +33,20 @@ import threading
 TCP_HOST = "0.0.0.0"
 TCP_PORT = 5000
 
+# Timeout send par socket client (secondes).
+# Si le buffer client est plein pendant plus de TCP_SEND_TIMEOUT,
+# le client est considere mort et retire de la liste.
+# CRITIQUE : sans ce timeout, c.sendall() bloque T-WSM indefiniment
+# et prive le watchdog de ses kicks -> timeout watchdog garanti.
+TCP_SEND_TIMEOUT = 0.050   # 50ms max par client
+
 
 class TCPBroadcast:
     """
     Serveur TCP léger.
     - Accepte N clients simultanement.
-    - Envoie un JSON d'état a tous les clients connectés.
+    - Envoie un JSON d'état a tous les clients connectés via une queue
+      asynchrone : send() ne bloque JAMAIS le thread appelant (T-WSM).
     - Envoie l'etat courant immediatement a chaque nouveau client.
     - Totalement passif : ne touche pas au RTE, ne modifie rien.
     """
@@ -47,16 +56,23 @@ class TCPBroadcast:
         self._clients_lock = threading.Lock()
         self._running      = False
         self._last_msg     = None   # dernier JSON envoye -- pour les nouveaux clients
+        # Queue de messages a diffuser : T-WSM depose, T-TCP-SEND consomme
+        self._send_queue   = queue.Queue(maxsize=32)
 
     def start(self):
-        """Lance le thread d'acceptation TCP (daemon)."""
+        """Lance le thread d'acceptation TCP et le thread d'envoi asynchrone."""
         self._running = True
-        t = threading.Thread(
+        threading.Thread(
             target=self._accept_loop,
             daemon=True,
             name="T-TCP"
-        )
-        t.start()
+        ).start()
+        # Thread dédié à l'envoi : consomme la queue sans bloquer T-WSM
+        threading.Thread(
+            target=self._sender_loop,
+            daemon=True,
+            name="T-TCP-SEND"
+        ).start()
         print(f"[TCP] Serveur demarre sur port {TCP_PORT}")
 
     def stop(self):
@@ -64,8 +80,10 @@ class TCPBroadcast:
 
     def send(self, rte) -> None:
         """
-        Construit le JSON depuis le RTE et l'envoie a tous les clients.
-        Appeler apres chaque transition d'etat ou changement significatif.
+        Construit le JSON depuis le RTE et le dépose dans la queue d'envoi.
+        RETOUR IMMÉDIAT : n'attend jamais le réseau. T-TCP-SEND se charge
+        de la diffusion réelle, ce qui garantit que T-WSM n'est jamais bloqué
+        par un client TCP lent ou déconnecté.
         """
         from bcm_rte import ST_ERROR, ST_DIAG
         state = rte.state
@@ -77,20 +95,34 @@ class TCPBroadcast:
             "current": round(rte.motor_current_a, 2),
             "rest":    "PARKING" if not rte.front_blade_moving else "EN MOUVEMENT",
             "fault":   state == ST_ERROR,
-            # ── Rest contact temps réel (GPIO26) ──────────────────────────
-            # rest_contact_raw : True=GPIO1=lame EN MOUVEMENT / False=GPIO0=repos
             "rest_contact_raw":   bool(getattr(rte, "rest_contact_raw",   False)),
             "front_blade_cycles": int(getattr(rte, "front_blade_cycles",  0)),
-            # ── CRS fault reçu de la trame LIN 0x17 ──────────────────────
             "crs_fault":          int(getattr(rte, "crs_fault",           0x00)),
         }
-        msg = json.dumps(payload) + "\n"
-        self._last_msg = msg.encode()   # sauvegarde pour nouveaux clients
-        self._broadcast(self._last_msg)
+        msg = (json.dumps(payload) + "\n").encode()
+        self._last_msg = msg   # sauvegarde pour les nouveaux clients
+        # Dépôt non-bloquant : si la queue est pleine, on jette le message
+        # (mieux vaut perdre un rafraîchissement que bloquer T-WSM)
+        try:
+            self._send_queue.put_nowait(msg)
+        except queue.Full:
+            pass   # client trop lent : message sacrifié, T-WSM non bloqué
 
     # ─────────────────────────────────────────────────
     # Interne
     # ─────────────────────────────────────────────────
+
+    def _sender_loop(self):
+        """
+        Thread T-TCP-SEND : consomme la queue et diffuse vers les clients.
+        Seul ce thread appelle _broadcast() -> T-WSM n'est JAMAIS bloqué.
+        """
+        while self._running:
+            try:
+                msg = self._send_queue.get(timeout=0.2)
+                self._broadcast(msg)
+            except queue.Empty:
+                continue
 
     def _accept_loop(self):
         import time as _time
@@ -156,11 +188,15 @@ class TCPBroadcast:
             print(f"[TCP] Client deconnecte : {addr}")
 
     def _broadcast(self, msg: bytes):
-        """Envoie msg a tous les clients, retire les morts."""
+        """
+        Envoie msg à tous les clients avec timeout par socket.
+        TCP_SEND_TIMEOUT empêche un client lent de bloquer les autres.
+        """
         dead = []
         with self._clients_lock:
             for c in self._clients:
                 try:
+                    c.settimeout(TCP_SEND_TIMEOUT)
                     c.sendall(msg)
                 except Exception:
                     dead.append(c)

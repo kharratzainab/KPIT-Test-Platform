@@ -10,32 +10,37 @@
             "description": "Front Motor Blocked - Overcurrent > threshold 300ms",
             "category": "electrical",
             "storage": "confirmed",
-            "status": 47,
+            "status": 46,
             "occurrence_count": 1,
-            "first_occurrence": "2026-03-31 09:17:45 BST",
-            "last_occurrence": "2026-03-31 09:17:45 BST",
+            "first_occurrence": "2026-05-07 12:04:58 BST",
+            "last_occurrence": "2026-05-07 12:04:58 BST",
             "snapshot": {
-                "ignition": 1,
-                "wiper_mode": "OFF",
-                "motor_curr": 0,
-                "blade_pos": 0,
+                "ignition": 2,
+                "wiper_mode": "SPEED1",
+                "motor_curr": 950,
+                "blade_pos": 1,
                 "rain": 0,
-                "vehicle_spd": 0
+                "vehicle_spd": 0.0
             },
             "snapshot_records": [
                 {
                     "record_number": 1,
-                    "timestamp": "2026-03-31 09:17:45 BST",
+                    "timestamp": "2026-05-07 12:04:58 BST",
                     "data": {
-                        "F190_ignition": 1,
-                        "F191_wiper_mode": "OFF",
-                        "F192_motor_curr": 0,
-                        "F193_blade_pos": 0,
+                        "F190_ignition": 2,
+                        "F191_wiper_mode": "SPEED1",
+                        "F192_motor_curr": 950,
+                        "F193_blade_pos": 1,
                         "F194_rain": 0,
-                        "F195_vehicle_spd": 0
+                        "F195_vehicle_spd": 0.0
                     }
                 }
-            ]
+            ],
+            "first_occurrence_ts": 1778151898.9186225,
+            "last_occurrence_ts": 1778151898.9186172,
+            "failed_cycles": 1,
+            "ageing_counter": 0,
+            "_seen_this_cycle": false
         },
         "B2002": {
             "bytes": [
@@ -51,7 +56,12 @@
             "first_occurrence": null,
             "last_occurrence": null,
             "snapshot": {},
-            "snapshot_records": []
+            "snapshot_records": [],
+            "first_occurrence_ts": null,
+            "last_occurrence_ts": null,
+            "failed_cycles": 0,
+            "ageing_counter": 0,
+            "_seen_this_cycle": false
         },
         "B2003": {
             "bytes": [
@@ -59,15 +69,88 @@
                 32,
                 3
             ],
-            "description": "Pump Overcurrent - Current > threshold",
+            "description": "Pump Overcurrent/Electrical Fault",
             "category": "electrical",
             "storage": "confirmed",
-            "status": 0,
-            "occurrence_count": 0,
-            "first_occurrence": null,
-            "last_occurrence": null,
-            "snapshot": {},
-            "snapshot_records": []
+            "status": 46,
+            "occurrence_count": 17,
+            "first_occurrence": "2026-05-07 12:19:16 BST",
+            "last_occurrence": "2026-05-07 13:06:57 BST",
+            "snapshot": {
+                "ignition": 2,
+                "wiper_mode": "REAR_WIPE",
+                "motor_curr": 655,
+                "blade_pos": 0,
+                "rain": 0,
+                "vehicle_spd": 0.0
+            },
+            "snapshot_records": [
+                {
+                    "record_number": 13,
+                    "timestamp": "2026-05-07 12:54:38 BST",
+                    "data": {
+                        "F190_ignition": 1,
+                        "F191_wiper_mode": "OFF",
+                        "F192_motor_curr": 0,
+                        "F193_blade_pos": 0,
+                        "F194_rain": 0,
+                        "F195_vehicle_spd": 0
+                    }
+                },
+                {
+                    "record_number": 14,
+                    "timestamp": "2026-05-07 12:54:45 BST",
+                    "data": {
+                        "F190_ignition": 1,
+                        "F191_wiper_mode": "OFF",
+                        "F192_motor_curr": 0,
+                        "F193_blade_pos": 0,
+                        "F194_rain": 0,
+                        "F195_vehicle_spd": 0
+                    }
+                },
+                {
+                    "record_number": 15,
+                    "timestamp": "2026-05-07 12:57:55 BST",
+                    "data": {
+                        "F190_ignition": 0,
+                        "F191_wiper_mode": "OFF",
+                        "F192_motor_curr": 0,
+                        "F193_blade_pos": 0,
+                        "F194_rain": 0,
+                        "F195_vehicle_spd": 0.0
+                    }
+                },
+                {
+                    "record_number": 16,
+                    "timestamp": "2026-05-07 12:58:32 BST",
+                    "data": {
+                        "F190_ignition": 0,
+                        "F191_wiper_mode": "OFF",
+                        "F192_motor_curr": 0,
+                        "F193_blade_pos": 0,
+                        "F194_rain": 0,
+                        "F195_vehicle_spd": 0.0
+                    }
+                },
+                {
+                    "record_number": 17,
+                    "timestamp": "2026-05-07 13:06:57 BST",
+                    "data": {
+                        "F190_ignition": 2,
+                        "F191_wiper_mode": "REAR_WIPE",
+                        "F192_motor_curr": 655,
+                        "F193_blade_pos": 0,
+                        "F194_rain": 0,
+                        "F195_vehicle_spd": 0.0
+                    }
+                }
+            ],
+            "first_occurrence_ts": 1778152756.4639797,
+            "last_occurrence_ts": 1778155617.8421204,
+            "failed_cycles": 2,
+            "ageing_counter": 0,
+            "_seen_this_cycle": true
         },
         "B2004": {
             "bytes": [
@@ -78,12 +161,37 @@
             "description": "LIN Timeout CRS - No valid frame for 100ms",
             "category": "communication",
             "storage": "confirmed",
-            "status": 0,
-            "occurrence_count": 0,
-            "first_occurrence": null,
-            "last_occurrence": null,
-            "snapshot": {},
-            "snapshot_records": []
+            "status": 46,
+            "occurrence_count": 1,
+            "first_occurrence": "2026-05-07 12:04:20 BST",
+            "last_occurrence": "2026-05-07 12:04:20 BST",
+            "snapshot": {
+                "ignition": 0,
+                "wiper_mode": "OFF",
+                "motor_curr": 0,
+                "blade_pos": 0,
+                "rain": 0,
+                "vehicle_spd": 0.0
+            },
+            "snapshot_records": [
+                {
+                    "record_number": 1,
+                    "timestamp": "2026-05-07 12:04:20 BST",
+                    "data": {
+                        "F190_ignition": 0,
+                        "F191_wiper_mode": "OFF",
+                        "F192_motor_curr": 0,
+                        "F193_blade_pos": 0,
+                        "F194_rain": 0,
+                        "F195_vehicle_spd": 0.0
+                    }
+                }
+            ],
+            "first_occurrence_ts": 1778151860.5699008,
+            "last_occurrence_ts": 1778151860.569895,
+            "failed_cycles": 1,
+            "ageing_counter": 0,
+            "_seen_this_cycle": false
         },
         "B2005": {
             "bytes": [
@@ -94,12 +202,61 @@
             "description": "CAN Timeout WC - No Wiper_Status for 100ms",
             "category": "communication",
             "storage": "confirmed",
-            "status": 0,
-            "occurrence_count": 0,
-            "first_occurrence": null,
-            "last_occurrence": null,
-            "snapshot": {},
-            "snapshot_records": []
+            "status": 46,
+            "occurrence_count": 3,
+            "first_occurrence": "2026-05-07 12:05:38 BST",
+            "last_occurrence": "2026-05-07 13:27:16 BST",
+            "snapshot": {
+                "ignition": 1,
+                "wiper_mode": "OFF",
+                "motor_curr": 0,
+                "blade_pos": 0,
+                "rain": 0,
+                "vehicle_spd": 0.0
+            },
+            "snapshot_records": [
+                {
+                    "record_number": 1,
+                    "timestamp": "2026-05-07 12:05:38 BST",
+                    "data": {
+                        "F190_ignition": 2,
+                        "F191_wiper_mode": "SPEED1",
+                        "F192_motor_curr": 625,
+                        "F193_blade_pos": 1,
+                        "F194_rain": 0,
+                        "F195_vehicle_spd": 0.0
+                    }
+                },
+                {
+                    "record_number": 2,
+                    "timestamp": "2026-05-07 12:07:22 BST",
+                    "data": {
+                        "F190_ignition": 2,
+                        "F191_wiper_mode": "OFF",
+                        "F192_motor_curr": 0,
+                        "F193_blade_pos": 0,
+                        "F194_rain": 0,
+                        "F195_vehicle_spd": 0.0
+                    }
+                },
+                {
+                    "record_number": 3,
+                    "timestamp": "2026-05-07 13:27:16 BST",
+                    "data": {
+                        "F190_ignition": 1,
+                        "F191_wiper_mode": "OFF",
+                        "F192_motor_curr": 0,
+                        "F193_blade_pos": 0,
+                        "F194_rain": 0,
+                        "F195_vehicle_spd": 0.0
+                    }
+                }
+            ],
+            "first_occurrence_ts": 1778151938.3885446,
+            "last_occurrence_ts": 1778156836.6266704,
+            "failed_cycles": 2,
+            "ageing_counter": 0,
+            "_seen_this_cycle": true
         },
         "B2006": {
             "bytes": [
@@ -110,12 +267,49 @@
             "description": "Blade Position Implausible - No movement detected",
             "category": "functional",
             "storage": "confirmed",
-            "status": 0,
-            "occurrence_count": 0,
-            "first_occurrence": null,
-            "last_occurrence": null,
-            "snapshot": {},
-            "snapshot_records": []
+            "status": 46,
+            "occurrence_count": 2,
+            "first_occurrence": "2026-05-07 12:07:39 BST",
+            "last_occurrence": "2026-05-07 12:10:07 BST",
+            "snapshot": {
+                "ignition": 2,
+                "wiper_mode": "OFF",
+                "motor_curr": 0,
+                "blade_pos": 0,
+                "rain": 0,
+                "vehicle_spd": 0.0
+            },
+            "snapshot_records": [
+                {
+                    "record_number": 1,
+                    "timestamp": "2026-05-07 12:07:39 BST",
+                    "data": {
+                        "F190_ignition": 2,
+                        "F191_wiper_mode": "OFF",
+                        "F192_motor_curr": 0,
+                        "F193_blade_pos": 0,
+                        "F194_rain": 0,
+                        "F195_vehicle_spd": 0.0
+                    }
+                },
+                {
+                    "record_number": 2,
+                    "timestamp": "2026-05-07 12:10:07 BST",
+                    "data": {
+                        "F190_ignition": 2,
+                        "F191_wiper_mode": "OFF",
+                        "F192_motor_curr": 0,
+                        "F193_blade_pos": 0,
+                        "F194_rain": 0,
+                        "F195_vehicle_spd": 0.0
+                    }
+                }
+            ],
+            "first_occurrence_ts": 1778152059.6087081,
+            "last_occurrence_ts": 1778152207.1846592,
+            "failed_cycles": 1,
+            "ageing_counter": 0,
+            "_seen_this_cycle": false
         },
         "B2007": {
             "bytes": [
@@ -131,7 +325,12 @@
             "first_occurrence": null,
             "last_occurrence": null,
             "snapshot": {},
-            "snapshot_records": []
+            "snapshot_records": [],
+            "first_occurrence_ts": null,
+            "last_occurrence_ts": null,
+            "failed_cycles": 0,
+            "ageing_counter": 0,
+            "_seen_this_cycle": false
         },
         "B2008": {
             "bytes": [
@@ -142,12 +341,73 @@
             "description": "Pump Runtime Exceeded - Active more than 5 seconds",
             "category": "protection",
             "storage": "confirmed",
-            "status": 0,
-            "occurrence_count": 0,
-            "first_occurrence": null,
-            "last_occurrence": null,
-            "snapshot": {},
-            "snapshot_records": []
+            "status": 46,
+            "occurrence_count": 4,
+            "first_occurrence": "2026-05-07 12:18:40 BST",
+            "last_occurrence": "2026-05-07 12:39:45 BST",
+            "snapshot": {
+                "ignition": 1,
+                "wiper_mode": "OFF",
+                "motor_curr": 0,
+                "blade_pos": 0,
+                "rain": 0,
+                "vehicle_spd": 0.0
+            },
+            "snapshot_records": [
+                {
+                    "record_number": 1,
+                    "timestamp": "2026-05-07 12:18:40 BST",
+                    "data": {
+                        "F190_ignition": 1,
+                        "F191_wiper_mode": "OFF",
+                        "F192_motor_curr": 0,
+                        "F193_blade_pos": 0,
+                        "F194_rain": 0,
+                        "F195_vehicle_spd": 0.0
+                    }
+                },
+                {
+                    "record_number": 2,
+                    "timestamp": "2026-05-07 12:20:05 BST",
+                    "data": {
+                        "F190_ignition": 1,
+                        "F191_wiper_mode": "OFF",
+                        "F192_motor_curr": 0,
+                        "F193_blade_pos": 0,
+                        "F194_rain": 0,
+                        "F195_vehicle_spd": 0.0
+                    }
+                },
+                {
+                    "record_number": 3,
+                    "timestamp": "2026-05-07 12:37:53 BST",
+                    "data": {
+                        "F190_ignition": 1,
+                        "F191_wiper_mode": "OFF",
+                        "F192_motor_curr": 0,
+                        "F193_blade_pos": 0,
+                        "F194_rain": 0,
+                        "F195_vehicle_spd": 0.0
+                    }
+                },
+                {
+                    "record_number": 4,
+                    "timestamp": "2026-05-07 12:39:45 BST",
+                    "data": {
+                        "F190_ignition": 1,
+                        "F191_wiper_mode": "OFF",
+                        "F192_motor_curr": 0,
+                        "F193_blade_pos": 0,
+                        "F194_rain": 0,
+                        "F195_vehicle_spd": 0.0
+                    }
+                }
+            ],
+            "first_occurrence_ts": 1778152720.7789967,
+            "last_occurrence_ts": 1778153985.1970315,
+            "failed_cycles": 2,
+            "ageing_counter": 0,
+            "_seen_this_cycle": true
         },
         "B2009": {
             "bytes": [
@@ -158,12 +418,78 @@
             "description": "Rest Contact Failure - Signal stuck",
             "category": "electrical",
             "storage": "confirmed",
-            "status": 0,
-            "occurrence_count": 0,
-            "first_occurrence": null,
-            "last_occurrence": null,
-            "snapshot": {},
-            "snapshot_records": []
+            "status": 47,
+            "occurrence_count": 1,
+            "first_occurrence": "2026-05-07 12:06:56 BST",
+            "last_occurrence": "2026-05-07 12:06:56 BST",
+            "snapshot": {
+                "ignition": 2,
+                "wiper_mode": "SPEED1",
+                "motor_curr": 625,
+                "blade_pos": 1,
+                "rain": 0,
+                "vehicle_spd": 0.0
+            },
+            "snapshot_records": [
+                {
+                    "record_number": 1,
+                    "timestamp": "2026-05-07 12:06:56 BST",
+                    "data": {
+                        "F190_ignition": 2,
+                        "F191_wiper_mode": "SPEED1",
+                        "F192_motor_curr": 625,
+                        "F193_blade_pos": 1,
+                        "F194_rain": 0,
+                        "F195_vehicle_spd": 0.0
+                    }
+                }
+            ],
+            "first_occurrence_ts": 1778152016.1179771,
+            "last_occurrence_ts": 1778152016.117972,
+            "failed_cycles": 2,
+            "ageing_counter": 0,
+            "_seen_this_cycle": true
+        },
+        "B2011": {
+            "bytes": [
+                178,
+                1,
+                27
+            ],
+            "description": "Wiper Stick Stuck ",
+            "category": "electrical",
+            "storage": "confirmed",
+            "status": 46,
+            "occurrence_count": 1,
+            "first_occurrence": "2026-05-07 12:06:26 BST",
+            "last_occurrence": "2026-05-07 12:06:26 BST",
+            "snapshot": {
+                "ignition": 2,
+                "wiper_mode": "OFF",
+                "motor_curr": 0,
+                "blade_pos": 0,
+                "rain": 0,
+                "vehicle_spd": 0.0
+            },
+            "snapshot_records": [
+                {
+                    "record_number": 1,
+                    "timestamp": "2026-05-07 12:06:26 BST",
+                    "data": {
+                        "F190_ignition": 2,
+                        "F191_wiper_mode": "OFF",
+                        "F192_motor_curr": 0,
+                        "F193_blade_pos": 0,
+                        "F194_rain": 0,
+                        "F195_vehicle_spd": 0.0
+                    }
+                }
+            ],
+            "first_occurrence_ts": 1778151986.5389636,
+            "last_occurrence_ts": 1778151986.5389583,
+            "failed_cycles": 1,
+            "ageing_counter": 0,
+            "_seen_this_cycle": false
         }
     }
 }

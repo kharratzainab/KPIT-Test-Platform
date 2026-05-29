@@ -25,6 +25,7 @@ UTILISATION dans bcm_application.py :
 """
 
 import json
+import queue
 import socket
 import threading
 import time
@@ -33,6 +34,9 @@ from bcm_rte import ST_ERROR, PUMP_MAX_RUNTIME, PUMP_OVERCURRENT_THRESH
 
 TCP_PUMP_HOST = "0.0.0.0"
 TCP_PUMP_PORT = 5556
+
+# Identique à bcm_tcp_broadcast : timeout send pour ne jamais bloquer T-WSM/T-PUMP
+TCP_SEND_TIMEOUT = 0.050   # 50ms max par client
 
 
 class TCPPumpBroadcast:
@@ -47,15 +51,23 @@ class TCPPumpBroadcast:
         self._clients_lock = threading.Lock()
         self._running      = False
         self._last_msg     = None   # dernier JSON envoye -- pour les nouveaux clients
+        # [VARIABLE LOAD] Queue agrandie pour absorber le flux continu
+        # (lecture toutes les 10ms = 100 msg/s -> 200 slots = 2s de buffer)
+        # Avant : maxsize=32 -> saturation en 320ms -> messages sacrifies -> 1 seule valeur affichee
+        self._send_queue   = queue.Queue(maxsize=200)
 
     def start(self):
         self._running = True
-        t = threading.Thread(
+        threading.Thread(
             target=self._accept_loop,
             daemon=True,
             name="T-TCP-PUMP"
-        )
-        t.start()
+        ).start()
+        threading.Thread(
+            target=self._sender_loop,
+            daemon=True,
+            name="T-TCP-PUMP-SEND"
+        ).start()
         print(f"[TCP-PUMP] Serveur demarre sur port {TCP_PUMP_PORT}")
 
     def stop(self):
@@ -63,53 +75,66 @@ class TCPPumpBroadcast:
 
     def send(self, rte) -> None:
         """
-        Construit le JSON pompe depuis le RTE et l'envoie a tous les clients.
-        Appeler apres chaque changement d'etat pompe ou de courant.
+        Construit le JSON pompe et le dépose dans la queue d'envoi.
+        RETOUR IMMÉDIAT : ne bloque jamais T-WSM ni T-PUMP.
         """
-        # --- Etat pompe ---
-        direction = rte.pump_direction  # 0=off / 1=FWD / 2=BWD
+        direction = rte.pump_direction
         if rte.pump_active:
             pump_state = "FORWARD" if direction == 1 else "BACKWARD"
         else:
             pump_state = "OFF"
 
-        # --- Fault / overcurrent ---
-        is_error      = rte.state == ST_ERROR
         is_overcurrent = rte.motor_current_a > PUMP_OVERCURRENT_THRESH and rte.pump_active
-        fault         = is_error or is_overcurrent
-        fault_reason  = "OVERCURRENT" if is_overcurrent else ""
+
+        # ST_ERROR est une faute pompe uniquement si pump_error=True.
+        # Si c'est une erreur moteur/lame (wiper_fault), la pompe continue normalement
+        # → ne pas signaler FAULT côté pompe.
+        pump_is_error = (rte.state == ST_ERROR) and rte.pump_error
+        fault         = pump_is_error or is_overcurrent
+        fault_reason  = "OVERCURRENT" if is_overcurrent else ("PUMP_ERROR" if pump_is_error else "")
         if fault and pump_state not in ("FORWARD", "BACKWARD"):
             pump_state = "FAULT"
 
-        # --- Temps restant ---
         if rte.pump_active and rte.t_pump_start > 0:
             elapsed         = time.time() - rte.t_pump_start
             pump_remaining  = round(max(0.0, PUMP_MAX_RUNTIME - elapsed), 1)
         else:
             pump_remaining  = 0.0
 
+        # [VARIABLE LOAD] 5 decimales pour capturer les petites variations de charge
+        # Avant : round(..., 3/2/4) -> variations < 1mA invisibles -> 1 seule valeur affichee
         payload = {
             "state":          pump_state,
-            "current":        round(rte.pump_current_a, 3),   # ACS712 canal A0
-            "voltage":        round(rte.pump_voltage_v, 2),   # calcule depuis ACS712
-            "v_b":            round(rte.pump_v_b, 4),         # tension brute ADS1115
-            "v_a":            round(rte.pump_v_a, 4),         # tension calculee noeud A
+            "current":        round(rte.pump_current_a, 5),
+            "voltage":        round(rte.pump_voltage_v, 5),
+            "v_b":            round(rte.pump_v_b,       5),
+            "v_a":            round(rte.pump_v_a,       5),
             "fault":          fault,
             "fault_reason":   fault_reason,
-            "fault_mode":     rte.pump_fault_mode,            # NORMAL/OPEN LOAD/...
-            "fault_target":   rte.pump_fault_target,          # POMPE/MOTEUR
             "pump_remaining": pump_remaining,
             "pump_duration":  PUMP_MAX_RUNTIME,
             "source":         "BCM",
         }
 
-        msg = json.dumps(payload) + "\n"
-        self._last_msg = msg.encode()
-        self._broadcast(self._last_msg)
+        msg = (json.dumps(payload) + "\n").encode()
+        self._last_msg = msg
+        try:
+            self._send_queue.put_nowait(msg)
+        except queue.Full:
+            pass   # client lent : message sacrifié, threads non bloqués
 
     # ─────────────────────────────────────────────────
     # Interne
     # ─────────────────────────────────────────────────
+
+    def _sender_loop(self):
+        """Thread T-TCP-PUMP-SEND : diffuse les messages sans bloquer T-WSM/T-PUMP."""
+        while self._running:
+            try:
+                msg = self._send_queue.get(timeout=0.2)
+                self._broadcast(msg)
+            except queue.Empty:
+                continue
 
     def _accept_loop(self):
         import time as _time
@@ -177,6 +202,7 @@ class TCPPumpBroadcast:
         with self._clients_lock:
             for c in self._clients:
                 try:
+                    c.settimeout(TCP_SEND_TIMEOUT)
                     c.sendall(msg)
                 except Exception:
                     dead.append(c)
